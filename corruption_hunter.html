@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Corruption Hunter</title>
+<style>
+:root{--ink:#172b3a;--muted:#5e7180;--paper:#f4f7f6;--green:#197a58;--gold:#f4bd4f;--red:#d94d4d}
+*{box-sizing:border-box}body{margin:0;background:#e8efed;color:var(--ink);font:15px/1.45 system-ui,-apple-system,Segoe UI,sans-serif}
+header{background:#142c3c;color:white;padding:14px 20px;display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap}h1{font-size:clamp(22px,3vw,30px);margin:0;letter-spacing:.3px}header p{margin:2px 0 0;color:#c9d9df;font-size:13px}
+main{max-width:1250px;margin:16px auto;padding:0 14px;display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:14px}
+.game-wrap,.panel{background:white;border-radius:15px;box-shadow:0 5px 20px #19384c12;overflow:hidden}.game-wrap{position:relative;min-width:0}canvas{display:block;width:100%;height:auto;aspect-ratio:900/590;background:#c8dfb6;image-rendering:pixelated}
+.hud{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:12px;background:#f9fbfa;border-top:1px solid #e4ece8}.stat{padding:8px 10px;background:white;border:1px solid #e4ece8;border-radius:10px}.stat small{display:block;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px}.stat strong{font-size:18px}
+.panel{padding:16px}.panel h2{font-size:17px;margin:0 0 8px}.panel h3{font-size:14px;margin:16px 0 6px}.panel p{margin:6px 0;color:#435766}.bar{height:8px;background:#e5ece8;border-radius:9px;overflow:hidden;margin:8px 0 12px}.bar span{display:block;height:100%;background:var(--gold);width:100%;transition:width .2s}
+button{font:inherit;cursor:pointer;border:0;border-radius:9px;padding:10px 12px;background:var(--green);color:white;font-weight:700}button:hover{filter:brightness(.94)}button:disabled{background:#aebbb5;cursor:not-allowed}.secondary{background:#eaf1ee;color:var(--ink)}.danger{background:#b93636}.full{width:100%;margin-top:8px}
+.project{display:flex;justify-content:space-between;align-items:center;gap:8px;border:1px solid #e2eae6;padding:9px;border-radius:9px;margin:7px 0}.project p{font-size:12px;margin:2px 0}.project button{padding:7px 9px;font-size:12px;white-space:nowrap}
+#message{background:#fff7df;border:1px solid #f0d88f;border-radius:10px;padding:10px;margin:10px 0;color:#5b4918;min-height:48px}
+#dialog{display:none;position:absolute;inset:0;background:#102737b8;align-items:center;justify-content:center;padding:16px;z-index:3}#dialog.open{display:flex}.dialog-card{background:white;border-radius:15px;padding:20px;max-width:430px;width:100%;box-shadow:0 10px 40px #0003}.dialog-card h2{margin:0 0 8px}.dialog-card p{color:#435766}.choices{display:grid;gap:8px}.choices button{width:100%;text-align:left}.dialog-card .close{margin-top:12px}
+#intro{position:absolute;inset:0;background:#102737d9;display:flex;align-items:center;justify-content:center;padding:16px;z-index:4}.intro-card{max-width:480px;background:#fff;border-radius:18px;padding:24px}.intro-card h2{margin:0 0 8px;font-size:26px}.intro-card p{color:#435766}.intro-card ul{padding-left:20px;color:#435766}.key{display:inline-block;border:1px solid #c8d5cf;border-radius:5px;padding:1px 6px;background:#f6f9f7;font-weight:700;font-size:12px}
+footer{max-width:1250px;margin:0 auto 20px;padding:0 14px;color:#5b6d77;font-size:12px}
+@media(max-width:850px){main{grid-template-columns:1fr}.panel{order:2}.game-wrap{order:1}.hud{grid-template-columns:repeat(2,1fr)}}@media(max-width:480px){main{padding:0 8px;margin:8px auto;gap:8px}.panel{padding:13px}.hud{padding:8px;gap:6px}.stat strong{font-size:16px}}
+</style>
+</head>
+<body>
+<header><div><h1>🕵️ Corruption Hunter</h1><p>Follow the evidence. Recover the future.</p></div><div><button id="restartTop" class="secondary">↻ Restart</button></div></header>
+<main>
+<section class="game-wrap" aria-label="Game area">
+<canvas id="game" width="900" height="590" aria-label="Top-down city game"></canvas>
+<div class="hud">
+<div class="stat"><small>Investigation time</small><strong id="time">03:00</strong><div class="bar"><span id="timerBar"></span></div></div>
+<div class="stat"><small>Evidence</small><strong id="evidence">0 / 3</strong></div>
+<div class="stat"><small>Wrong accusations</small><strong id="mistakes">0 / 3</strong></div>
+<div class="stat"><small>Recovered funds</small><strong id="funds">₡0</strong></div>
+<div class="stat"><small>Projects complete</small><strong id="projectsDone">0 / 3</strong></div>
+<div class="stat"><small>Total score</small><strong id="score">0</strong></div>
+</div>
+<div id="intro"><div class="intro-card"><h2>Welcome to Veridia</h2><p>Public money has vanished while roads crumble and schools fall apart. You are an independent anti-corruption investigator. Build a case before time runs out, then put recovered money to work.</p><ul><li>Move with <b>WASD</b> or <b>arrow keys</b>.</li><li>Walk near a glowing marker and press <b>E</b>.</li><li>Collect all 3 evidence items before making an accusation.</li><li>Arrest only the politician supported by the evidence, then fund 3 city projects.</li></ul><button id="startBtn" class="full">Start investigation</button></div></div>
+<div id="dialog"><div class="dialog-card" id="dialogContent"></div></div>
+</section>
+<aside class="panel">
+<h2>Mission briefing</h2><p>Investigate three leads and submit a fair, evidence-based case against the right official.</p>
+<div id="message" role="status">Your investigation begins when you press “Start investigation.”</div>
+<h3>Evidence checklist</h3>
+<p id="check1">◯ Construction contract</p><p id="check2">◯ Missing-funds ledger</p><p id="check3">◯ Witness statement</p>
+<h3>Controls</h3><p><span class="key">W A S D</span> / <span class="key">↑ ↓ ← →</span> Move</p><p><span class="key">E</span> Interact with a nearby marker</p><p>Use the buttons in dialogue windows to make choices.</p>
+<div id="devSection" hidden><h3>Development projects</h3><p>Choose three projects. Each costs ₡2,000. Only recovered funds can be spent.</p>
+<div class="project"><div><b>🛣️ Repair roads</b><p>Safer travel and transport</p></div><button data-project="roads">Fund ₡2,000</button></div>
+<div class="project"><div><b>🏫 Improve school</b><p>Better classrooms and supplies</p></div><button data-project="school">Fund ₡2,000</button></div>
+<div class="project"><div><b>🏥 Build health clinic</b><p>More access to care</p></div><button data-project="clinic">Fund ₡2,000</button></div>
+<div class="project"><div><b>🌳 Clean public park</b><p>Green, welcoming public space</p></div><button data-project="park">Fund ₡2,000</button></div>
+</div>
+<button id="restartBottom" class="secondary full">Restart game</button>
+</aside>
+</main>
+<footer>Fictional setting and characters. The game teaches evidence-based investigation; accusations require collected evidence and confirmation.</footer>
+<script>
+(()=>{
+'use strict';
+const canvas=document.getElementById('game'),ctx=canvas.getContext('2d');
+const $=id=>document.getElementById(id);
+const W=canvas.width,H=canvas.height,keys={};
+const player={x:450,y:320,r:12,speed:190};
+const locations=[
+{id:'contract',x:240,y:190,label:'Contract files',icon:'📄',title:'Suspicious construction contract'},
+{id:'ledger',x:620,y:190,label:'City bank',icon:'🏦',title:'Missing-funds ledger'},
+{id:'witness',x:610,y:325,label:'Witness',icon:'🗣️',title:'Witness statement'},
+{id:'office',x:450,y:195,label:'Government office',icon:'🏛️',title:'Government office'}
+];
+const buildings=[
+{x:55,y:50,w:170,h:125,type:'office'},{x:330,y:42,w:145,h:95,type:'school'},
+{x:645,y:48,w:190,h:120,type:'bank'},{x:55,y:365,w:180,h:150,type:'homes'},
+{x:330,y:390,w:170,h:130,type:'site'},{x:625,y:345,w:210,h:165,type:'park'}
+];
+let started=false,ended=false,phase='investigation',timeLeft=180,last=0,score=0,funds=0,evidence=new Set(),mistakes=0,completed=new Set(),nearby=null,dialogOpen=false;
+const names={contract:'Suspicious construction contract',ledger:'Missing-funds ledger',witness:'Witness statement'};
+const projects={roads:{cost:2000,label:'Repair roads'},school:{cost:2000,label:'Improve school'},clinic:{cost:2000,label:'Build health clinic'},park:{cost:2000,label:'Clean public park'}};
+const evidenceText={
+contract:'The contract shows Mayor Daro Venn awarded a road project to a company he secretly owns. The bid was 40% above the independent estimate.',
+ledger:'The bank ledger records ₡8,000 in public funds transferred to a shell company linked to Mayor Daro Venn.',
+witness:'A procurement clerk confirms the mayor ordered the contract changed after the bids closed. The clerk agrees to provide a signed statement.'
+};
+function msg(t){$('message').textContent=t}
+function fmt(n){return '₡'+n.toLocaleString('en-US')}
+function updateUI(){
+$('time').textContent=`${String(Math.floor(timeLeft/60)).padStart(2,'0')}:${String(Math.max(0,Math.floor(timeLeft%60))).padStart(2,'0')}`;
+$('timerBar').style.width=Math.max(0,timeLeft/180*100)+'%';
+$('evidence').textContent=`${evidence.size} / 3`;$('mistakes').textContent=`${mistakes} / 3`;
+$('funds').textContent=fmt(funds);$('projectsDone').textContent=`${completed.size} / 3`;$('score').textContent=score;
+['contract','ledger','witness'].forEach((id,i)=>{$('check'+(i+1)).textContent=(evidence.has(id)?'✓ ':'◯ ')+names[id]});
+document.querySelectorAll('[data-project]').forEach(b=>{const id=b.dataset.project;b.disabled=phase!=='development'||completed.has(id)||funds<projects[id].cost||completed.size>=3;b.textContent=completed.has(id)?'Completed ✓':`Fund ${fmt(projects[id].cost)}`});
+$('devSection').hidden=phase!=='development';
+}
+function drawBuilding(b){
+const styles={office:['#d9b67a','#9b7443'],school:['#e9d39b','#bc9d59'],bank:['#a9c7d7','#66899e'],homes:['#c9b3a0','#987b67'],site:['#d5c6a4','#927b53'],park:['#8bc18b','#4f945b']};
+let [fill,edge]=styles[b.type];ctx.fillStyle=edge;ctx.fillRect(b.x-3,b.y-3,b.w+6,b.h+6);ctx.fillStyle=fill;ctx.fillRect(b.x,b.y,b.w,b.h);
+if(b.type==='office'){ctx.fillStyle='#fff4d7';for(let x=b.x+18;x<b.x+b.w-8;x+=32)ctx.fillRect(x,b.y+30,18,22);ctx.fillStyle='#bd4949';ctx.beginPath();ctx.moveTo(b.x+b.w/2,b.y-15);ctx.lineTo(b.x+b.w/2-25,b.y+4);ctx.lineTo(b.x+b.w/2+25,b.y+4);ctx.fill();ctx.fillStyle='#70543b';ctx.fillRect(b.x+b.w/2-18,b.y+b.h-34,36,34)}
+else if(b.type==='school'){ctx.fillStyle='#fff5da';ctx.fillRect(b.x+15,b.y+22,b.w-30,34);ctx.fillStyle='#a64b43';ctx.fillRect(b.x+62,b.y+57,22,38);ctx.fillStyle='#6b8491';ctx.fillRect(b.x+20,b.y+64,25,18);ctx.fillRect(b.x+105,b.y+64,25,18)}
+else if(b.type==='bank'){ctx.fillStyle='#e8f1f2';ctx.fillRect(b.x+18,b.y+36,b.w-36,62);ctx.fillStyle='#6d8790';for(let x=b.x+30;x<b.x+b.w-20;x+=35)ctx.fillRect(x,b.y+38,12,58);ctx.fillStyle='#7c9caa';ctx.fillRect(b.x+10,b.y+17,b.w-20,12)}
+else if(b.type==='homes'){for(let i=0;i<3;i++){ctx.fillStyle='#9c6e58';ctx.fillRect(b.x+15+i*52,b.y+20,42,48);ctx.fillStyle='#d9a79a';ctx.beginPath();ctx.moveTo(b.x+8+i*52,b.y+22);ctx.lineTo(b.x+36+i*52,b.y-2);ctx.lineTo(b.x+64+i*52,b.y+22);ctx.fill();ctx.fillStyle='#584d48';ctx.fillRect(b.x+30+i*52,b.y+42,12,26)}}
+else if(b.type==='site'){ctx.fillStyle='#b2a07c';ctx.fillRect(b.x+15,b.y+15,b.w-30,b.h-30);ctx.strokeStyle='#8a7755';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(b.x+20,b.y+20);ctx.lineTo(b.x+b.w-20,b.y+b.h-20);ctx.moveTo(b.x+b.w-20,b.y+20);ctx.lineTo(b.x+20,b.y+b.h-20);ctx.stroke();ctx.fillStyle='#e8b94d';ctx.fillRect(b.x+12,b.y+8,40,9)}
+else {ctx.fillStyle='#7dc77f';ctx.fillRect(b.x+8,b.y+8,b.w-16,b.h-16);for(let i=0;i<6;i++){let x=b.x+25+(i%3)*65,y=b.y+25+Math.floor(i/3)*70;ctx.fillStyle='#6c8f4b';ctx.beginPath();ctx.arc(x,y,13,0,Math.PI*2);ctx.fill();ctx.fillStyle='#3d8551';ctx.beginPath();ctx.arc(x-3,y-4,12,0,Math.PI*2);ctx.fill()}}
+}
+function draw(){
+ctx.clearRect(0,0,W,H);ctx.fillStyle='#c7dfb5';ctx.fillRect(0,0,W,H);
+// sidewalks and roads
+ctx.fillStyle='#a9b6b4';ctx.fillRect(0,245,W,100);ctx.fillRect(260,0,62,H);ctx.fillRect(545,0,62,H);
+ctx.fillStyle='#e7dfb8';ctx.fillRect(0,252,W,6);ctx.fillRect(0,332,W,6);ctx.fillRect(267,0,5,H);ctx.fillRect(310,0,5,H);ctx.fillRect(552,0,5,H);ctx.fillRect(595,0,5,H);
+ctx.strokeStyle='#f6f0cf';ctx.lineWidth=3;ctx.setLineDash([18,14]);ctx.beginPath();ctx.moveTo(0,295);ctx.lineTo(W,295);ctx.moveTo(290,0);ctx.lineTo(290,H);ctx.moveTo(575,0);ctx.lineTo(575,H);ctx.stroke();ctx.setLineDash([]);
+buildings.forEach(drawBuilding);
+// visual neglect at start; road repairs change map
+if(completed.has('roads')){ctx.fillStyle='#657c80';ctx.fillRect(0,270,W,50);ctx.strokeStyle='#f5e5a4';ctx.lineWidth=2;ctx.setLineDash([20,15]);ctx.beginPath();ctx.moveTo(0,295);ctx.lineTo(W,295);ctx.stroke();ctx.setLineDash([])}
+else {for(let i=0;i<9;i++){ctx.fillStyle='#69716f';ctx.beginPath();ctx.ellipse(35+i*103,282+(i%3)*22,8,4,0,0,Math.PI*2);ctx.fill()}for(let i=0;i<7;i++){ctx.fillStyle='#a1a69b';ctx.fillRect(30+i*130,225+(i%2)*125,8,6)}}
+if(completed.has('school')){ctx.fillStyle='#73b8d8';ctx.fillRect(348,64,109,25);ctx.fillStyle='#f8f5de';ctx.fillRect(364,69,17,14);ctx.fillRect(394,69,17,14);ctx.fillRect(424,69,17,14);ctx.fillStyle='#38734f';ctx.fillRect(335,138,135,5)}
+if(completed.has('clinic')){ctx.fillStyle='#e6f2f1';ctx.fillRect(348,405,135,95);ctx.fillStyle='#3f9e80';ctx.fillRect(365,421,100,54);ctx.fillStyle='white';ctx.fillRect(407,427,16,42);ctx.fillRect(394,440,42,15);ctx.fillStyle='#4c9a66';ctx.fillRect(350,493,130,5)}
+if(completed.has('park')){ctx.fillStyle='#77c67d';ctx.fillRect(635,355,190,145);for(let i=0;i<7;i++){let x=650+(i%4)*47,y=375+Math.floor(i/4)*65;ctx.fillStyle='#4b9254';ctx.beginPath();ctx.arc(x,y,13,0,7);ctx.fill();ctx.fillStyle='#f4e6a4';ctx.beginPath();ctx.arc(x+12,y+20,3,0,7);ctx.fill()}}
+if(completed.size===3){ctx.fillStyle='#f4f6d9';ctx.fillRect(20,15,260,25);ctx.fillStyle='#2b6d4e';ctx.font='bold 14px system-ui';ctx.fillText('VERIDIA IS MOVING FORWARD!',30,33)}
+// decorative litter and work barriers
+if(!completed.has('park')){ctx.fillStyle='#d4d7ce';[[650,515],[685,525],[740,520],[795,515]].forEach(p=>ctx.fillRect(p[0],p[1],7,5))}
+if(!completed.has('clinic')){ctx.fillStyle='#b7a080';ctx.fillRect(345,510,35,8);ctx.fillRect(390,515,45,7)}
+// location markers
+locations.forEach(l=>{
+if(l.id==='office'&&phase==='development')return;
+if(evidence.has(l.id))return;
+const pulse=4+Math.sin(Date.now()/250)*2;
+ctx.beginPath();ctx.fillStyle='rgba(255,199,71,.22)';ctx.arc(l.x,l.y,22+pulse,0,Math.PI*2);ctx.fill();
+ctx.beginPath();ctx.fillStyle='#f4bd4f';ctx.arc(l.x,l.y,17,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=3;ctx.stroke();
+ctx.fillStyle='#172b3a';ctx.font='bold 18px system-ui';ctx.textAlign='center';ctx.fillText(l.icon,l.x,l.y+6);
+ctx.fillStyle='#172b3a';ctx.font='bold 12px system-ui';ctx.fillText(l.label,l.x,l.y-27);
+});
+// player
+ctx.fillStyle='#24485c';ctx.beginPath();ctx.arc(player.x,player.y+4,13,0,Math.PI*2);ctx.fill();
+ctx.fillStyle='#f0c7a0';ctx.beginPath();ctx.arc(player.x,player.y-7,8,0,Math.PI*2);ctx.fill();
+ctx.fillStyle='#dceaf0';ctx.fillRect(player.x-8,player.y+1,16,12);ctx.fillStyle='#17394b';ctx.fillRect(player.x-4,player.y-9,8,3);
+if(nearby&&!dialogOpen&&started&&!ended){ctx.fillStyle='#142c3c';ctx.fillRect(player.x-55,player.y-45,110,23);ctx.fillStyle='white';ctx.font='bold 12px system-ui';ctx.textAlign='center';ctx.fillText('Press E to inspect',player.x,player.y-29)}
+ctx.textAlign='left';
+}
+function rectHit(x,y,r,b){return x+r>b.x&&x-r<b.x+b.w&&y+r>b.y&&y-r<b.y+b.h}
+function collides(x,y){
+const solids=buildings.filter(b=>!(b.type==='park'&&completed.has('park'))&&!(b.type==='school'&&completed.has('school')));
+return solids.some(b=>rectHit(x,y,player.r,b))||x<player.r||y<player.r||x>W-player.r||y>H-player.r;
+}
+function findNearby(){let best=null,dist=52;for(const l of locations){if(evidence.has(l.id))continue;if(l.id==='office'&&phase!=='investigation')continue;let d=Math.hypot(player.x-l.x,player.y-l.y);if(d<dist){dist=d;best=l}}return best}
+function openDialog(title,body,buttons){
+dialogOpen=true;$('dialog').classList.add('open');
+const content=$('dialogContent');content.innerHTML=`<h2>${title}</h2><p>${body}</p><div class="choices"></div><button class="secondary close">Close</button>`;
+const choices=content.querySelector('.choices');buttons.forEach(b=>{let el=document.createElement('button');el.textContent=b.label;el.onclick=()=>{closeDialog();b.action()};choices.appendChild(el)});
+content.querySelector('.close').onclick=closeDialog;
+}
+function closeDialog(){dialogOpen=false;$('dialog').classList.remove('open')}
+function interact(){
+if(!started||ended||dialogOpen)return;
+const l=findNearby();if(!l){msg('No investigation marker nearby. Move toward a glowing yellow marker and press E.');return}
+if(l.id==='office'){
+openDialog('Government office','You have not yet built a complete case. The case file needs all three evidence items before you can accuse anyone.',[{label:'Review case requirements',action:()=>msg('Find the contract, the ledger, and the witness statement before returning here.')}]);return}
+if(l.id==='witness'){
+openDialog('Meet the procurement clerk','The clerk will only give a signed statement if you explain the purpose of the investigation. What do you do?',[
+{label:'Explain the public-interest investigation',action:()=>collectEvidence(l.id)},
+{label:'Offer a bribe for information (wrong choice)',action:()=>{score=Math.max(0,score-100);msg('Bribery undermines the case. No evidence was collected; score −100.');updateUI()}}
+]);return}
+openDialog(l.title,evidenceText[l.id],[
+{label:'Record and secure this evidence',action:()=>collectEvidence(l.id)},
+{label:'Leave it for now',action:()=>msg('Lead remains available. Come back when ready.')}
+]);
+}
+function collectEvidence(id){
+if(evidence.has(id))return;
+evidence.add(id);score+=100;
+if(id==='ledger')funds+=8000;
+msg('Evidence secured: '+names[id]+'. '+(id==='ledger'?'₡8,000 in public money is now eligible for recovery.':''));
+updateUI();
+if(evidence.size===3){msg('All evidence collected. Return to the government office and submit your case.')}
+}
+function accuse(){
+if(evidence.size<3){msg('You need all 3 pieces of evidence before accusing anyone.');return}
+openDialog('Submit accusation','Your evidence points to Mayor Daro Venn. Submitting a formal accusation triggers an independent review. Do you want to submit the complete case?',[
+{label:'Yes — submit evidence against Mayor Daro Venn',action:()=>{score+=300;phase='development';funds=8000;msg('Independent review confirms the evidence. Mayor Daro Venn is arrested through due process. ₡8,000 recovered; development phase unlocked.');updateUI()}},
+{label:'Accuse Councilor Mira Sol instead',action:()=>wrongAccusation()},
+{label:'Cancel and review evidence',action:()=>msg('Case not submitted. Review your evidence before making a decision.')}
+]);
+}
+function wrongAccusation(){mistakes++;score=Math.max(0,score-150);msg('The evidence does not support that accusation. Wrong accusations damage public trust.');updateUI();if(mistakes>=3)finish(false,'Three incorrect accusations have ended your investigation. Evidence must guide decisions.')}
+function finish(win,reason){
+ended=true;phase=win?'won':'lost';closeDialog();updateUI();
+openDialog(win?'🏆 Veridia is changing!':'Investigation ended',reason+(win?'<br><br>Roads are repaired, the school is improved, the clinic is open, and the park is clean.':'<br><br>Restart to try again with a better investigation strategy.'),[{label:'Restart game',action:reset}]);
+}
+function fundProject(id){
+if(phase!=='development'||completed.has(id)||completed.size>=3)return;
+if(funds<projects[id].cost){msg('Not enough recovered funds for this project. No debt or overspending is allowed.');return}
+funds-=projects[id].cost;completed.add(id);score+=200;
+msg(projects[id].label+' completed. Public funds remaining: '+fmt(funds)+'. The city has visibly improved.');
+updateUI();draw();
+if(completed.size===3)finish(true,'You collected evidence, secured a lawful arrest, and completed three public development projects. Final score: '+score+'.');
+}
+function reset(){
+started=false;ended=false;phase='investigation';timeLeft=180;score=0;funds=0;evidence=new Set();mistakes=0;completed=new Set();player.x=450;player.y=320;nearby=null;dialogOpen=false;last=0;
+$('intro').style.display='flex';$('devSection').hidden=true;$('dialog').classList.remove('open');msg('Your investigation begins when you press “Start investigation.”');updateUI();draw();
+}
+function start(){started=true;ended=false;$('intro').style.display='none';timeLeft=180;last=performance.now();msg('Investigation active. Search the three glowing evidence locations.');updateUI()}
+window.addEventListener('keydown',e=>{const k=e.key.toLowerCase();if(['arrowup','arrowdown','arrowleft','arrowright',' '].includes(k))e.preventDefault();keys[k]=true;if(k==='e')interact();if(k==='escape'&&dialogOpen)closeDialog()});
+window.addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
+$('startBtn').onclick=start;$('restartTop').onclick=reset;$('restartBottom').onclick=reset;
+document.querySelectorAll('[data-project]').forEach(b=>b.onclick=()=>fundProject(b.dataset.project));
+function loop(now){
+const dt=last?Math.min((now-last)/1000,.04):0;last=now;
+if(started&&!ended&&!dialogOpen){
+if(phase==='investigation'){timeLeft=Math.max(0,timeLeft-dt);if(timeLeft<=0)finish(false,'The investigation timer reached zero before you completed the case.')}
+let dx=0,dy=0;if(keys.w||keys.arrowup)dy--;if(keys.s||keys.arrowdown)dy++;if(keys.a||keys.arrowleft)dx--;if(keys.d||keys.arrowright)dx++;
+if(dx||dy){const len=Math.hypot(dx,dy);dx=dx/len*player.speed*dt;dy=dy/len*player.speed*dt;
+if(!collides(player.x+dx,player.y))player.x+=dx;if(!collides(player.x,player.y+dy))player.y+=dy;}
+nearby=findNearby();
+}
+updateUI();draw();requestAnimationFrame(loop);
+}
+updateUI();requestAnimationFrame(loop);
+})();
+</script>
+</body></html>
